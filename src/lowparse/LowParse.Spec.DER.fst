@@ -469,7 +469,7 @@ let synth_der_length_129_recip
 let synth_be_int_recip
   (len: nat)
   (x: lint len)
-: GTot (b: Seq.lseq byte len)
+: GTot (Seq.lseq byte len)
 = E.n_to_be len x
 
 let synth_be_int_inverse

@@ -542,7 +542,7 @@ let recall_stable_region_repr_ptr #t (r:ST.drgn) (p:stable_region_repr_ptr r t)
 
 private
 let ralloc_and_blit (r:ST.drgn) (src:C.const_buffer LP.byte) (len:U32.t)
-  : ST (b:C.const_buffer LP.byte)
+  : ST (C.const_buffer LP.byte)
     (requires fun h0 ->
       HS.live_region h0 (ST.rid_of_drgn r) /\
       U32.v len == C.length src /\

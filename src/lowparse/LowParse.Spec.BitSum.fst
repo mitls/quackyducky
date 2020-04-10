@@ -1237,7 +1237,7 @@ let if_combinator_weak
 = (cond: bool) ->
   (sv_true: (cond_true cond -> Tot t)) ->
   (sv_false: (cond_false cond -> Tot t)) ->
-  Tot (y: t)
+  Tot t
 
 inline_for_extraction
 noextract
