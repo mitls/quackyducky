@@ -1,0 +1,25 @@
+UINT32 enum _c3danonenum0 {
+  KIND_INT = 1,
+}
+UINT32 enum _c3danonenum1 {
+  KIND_CHAR = 2,
+}
+UINT32 enum Enum8 {
+  Enum8_1 = 0,
+  Enum8_2 = 1,
+  Enum8_3 = 2,
+  Enum8_100 = 100,
+  Enum8_101 = 101,
+  Enum8_103 = 102,
+  Enum8_104 = 103,
+}
+entrypoint
+casetype sum (uint32_t kind) { 
+ switch (kind) {
+  case KIND_INT: 
+    uint32_t i;
+  case KIND_CHAR: 
+    uint8_t c;
+ }
+} sum, *Psum;
+

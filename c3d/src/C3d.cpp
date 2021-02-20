@@ -261,7 +261,7 @@ public:
   }
 
   // TODO: diagAppertainsToDecl ? It is not inherited from C3dDiagOnStruct,
-  // since C3dDiagOnStruct does not inherit from ParsedAttrInfo. It's default
+  // since C3dDiagOnStruct does not inherit from ParsedAttrInfo. It defaults
   // to true, which is fine for now.
 
   AttrHandling parseAttributePayload(Parser *P,
@@ -811,6 +811,7 @@ public:
   }
 };
 
+// This is acopy of C3dAttrWithVar but adds a parameter too
 class C3dAttrWithVar2 : public C3dSimpleSpelling, C3dDiagOnStruct {
   const char *Name;
   const char *InternalName;
@@ -927,6 +928,7 @@ public:
       case SeenType: {
         Expr *ArgExpr = Attr.getArgAsExpr(0);
 
+       // We add a parameter
        {
         std::string Str = "c3d_parameter";
         Str += ":";
@@ -977,6 +979,11 @@ public:
 
 struct C3dParameterAttrInfo : C3dAttrWithVar {
   C3dParameterAttrInfo(): C3dAttrWithVar{"everparse::parameter", "c3d_parameter"} {
+  }
+};
+
+struct C3dMutableParameterAttrInfo : C3dAttrWithVar {
+  C3dMutableParameterAttrInfo(): C3dAttrWithVar{"everparse::mutable_parameter", "c3d_mutable_parameter"} {
   }
 };
 
@@ -1195,7 +1202,8 @@ static ParsedAttrInfoRegistry::Add<C3dOnSuccessAttrInfo>
 static ParsedAttrInfoRegistry::Add<C3dOnFailureAttrInfo>
     X13("c3d_on_failure", "recognize everparse::on_failure");
 
-
+static ParsedAttrInfoRegistry::Add<C3dMutableParameterAttrInfo>
+    X14("c3d_mutable_parameter", "recognize everparse::mutable_parameter");
 
 //===----------------------------------------------------------------------===//
 
@@ -1207,7 +1215,7 @@ static ParsedAttrInfoRegistry::Add<C3dOnFailureAttrInfo>
 //   (I can imagine some syntactic hack to embed a spec-and-declarator inside an
 //   expression but let's leave this up to later).
 // - emitting a .3d file as we process attributes in the AST
-// - removing our annotations from the AST
+// - removing our annotations from the AST and writing a .preprocessed.h file
 //
 // The documentation for this part is found at
 // https://clang.llvm.org/docs/RAVFrontendAction.html, and
@@ -1227,6 +1235,20 @@ static ParsedAttrInfoRegistry::Add<C3dOnFailureAttrInfo>
 #include "clang/Rewrite/Core/Rewriter.h"
 
 namespace c3d {
+
+void pushAnnot(SmallVector<StringRef, 4> &Vec, int shift, AnnotateAttr *AA,
+               const char *prefix = "")
+{
+    std::string *R = new std::string;
+
+    StringRef A = AA -> getAnnotation();
+    A = A.slice(shift, A.size());
+
+    *R = prefix;
+    *R += A;
+    StringRef S = *R;
+    Vec.push_back(S);
+}
 
 using namespace std;
 
@@ -1399,9 +1421,9 @@ public:
     }
 
     AttrVec FilteredAttrs {};
-    SmallVector<AnnotateAttr *, 4> Parameters {};
-    SmallVector<AnnotateAttr *, 4> WhereClauses {};
-    SmallVector<AnnotateAttr *, 4> Switch{};
+    SmallVector<StringRef, 4> Parameters {};
+    SmallVector<StringRef, 4> WhereClauses {};
+    SmallVector<StringRef, 4> Switch{};
     for (const auto& A: R->attrs()) {
       if (const auto& AA = dyn_cast<AnnotateAttr>(A)) {
         // Location-related business.
@@ -1412,21 +1434,25 @@ public:
         End = AA->getRange().getEnd().getLocWithOffset(4);
 
         LLVM_DEBUG(llvm::dbgs() << "c3d: record has attribute " << AA->getAnnotation() << "\n");
-        if (AA->getAnnotation() == "c3d_process")
+        if (AA->getAnnotation() == "c3d_process") {
           HasProcess = true;
-        else if (AA->getAnnotation() == "c3d_entrypoint") {
+        } else if (AA->getAnnotation() == "c3d_entrypoint") {
           // GM: FIXME: locations are wrong for c3d_entrypoint, but
           // has no payload, so fix that here.
+          //
           End = AA->getRange().getEnd().getLocWithOffset(13);
           HasEntrypoint = true;
-        } else if (AA->getAnnotation().startswith("c3d_parameter:"))
-          Parameters.push_back(AA);
-        else if (AA->getAnnotation().startswith("c3d_where:"))
-          WhereClauses.push_back(AA);
-        else if (AA->getAnnotation().startswith("c3d_switch:"))
-          Switch.push_back(AA);
-        else
+        } else if (AA->getAnnotation().startswith("c3d_parameter:")) {
+          pushAnnot(Parameters, strlen("c3d_parameter:"), AA);
+        } else if (AA->getAnnotation().startswith("c3d_mutable_parameter:")) {
+          pushAnnot(Parameters, strlen("c3d_mutable_parameter:"), AA, "mutable ");
+        } else if (AA->getAnnotation().startswith("c3d_where:")) {
+          pushAnnot(WhereClauses, strlen("c3d_where:"), AA);
+        } else if (AA->getAnnotation().startswith("c3d_switch:")) {
+          pushAnnot(Switch, strlen("c3d_switch:"), AA);
+        } else {
           FilteredAttrs.push_back(AA);
+        }
       } else {
         FilteredAttrs.push_back(AA);
       }
@@ -1435,6 +1461,11 @@ public:
     // Early-abort.
     if (!HasProcess)
       return true;
+
+    assert ((Switch.size() == 0 || Kind == Union)
+                && "everparse::switch can only be used on unions");
+    assert (Switch.size() <= 1
+                && "There must be exactly one switch for a union");
 
     // Need to drop-then-assign, as just calling setAttrs triggers an assertion
     // failure.
@@ -1479,16 +1510,15 @@ public:
     // Printing parameters
     enum { BeforeLParen, InArgs } State = BeforeLParen;
     for (const auto& A: Parameters) {
-      const int shift = strlen("c3d_parameter:");
       switch (State) {
         case BeforeLParen:
           Out << " (";
-          Out << A->getAnnotation().slice(shift, A->getAnnotation().size());
+          Out << A;
           State = InArgs;
           break;
         case InArgs:
           Out << ", ";
-          Out << A->getAnnotation().slice(shift, A->getAnnotation().size());
+          Out << A;
           break;
       }
     }
@@ -1499,7 +1529,6 @@ public:
     // since that's what 3d expects.
     if (! WhereClauses.empty()) {
         enum { First, Mid } State = First;
-        const int shift = strlen("c3d_where:");
         Out << "\nwhere ";
         for (const auto& W: WhereClauses) {
             switch (State) {
@@ -1508,7 +1537,7 @@ public:
                     [[fallthrough]];
 
                 case First:
-                    Out << "(" << W->getAnnotation().slice(shift, W->getAnnotation().size()) << ")";
+                    Out << "(" << W << ")";
                     State = Mid;
                     break;
             }
@@ -1518,13 +1547,8 @@ public:
 
     Out << " { \n";
 
-    if (Kind == Union) {
-      assert (Switch.size() == 1 && "There must be exactly one switch for a casetype");
-      AnnotateAttr *A = Switch[0];
-      const int shift = strlen("c3d_switch:");
-
-      Out << " switch (" << A->getAnnotation().slice(shift, A->getAnnotation().size()) << ") {\n";
-    }
+    if (Kind == Union)
+      Out << " switch (" << Switch[0] << ") {\n";
 
     LLVM_DEBUG(llvm::dbgs() << "c3d: everparse::process found (entrypoint: " << HasEntrypoint << "), reviewing fields\n");
     for (const auto& F: R->fields()) {
@@ -1555,9 +1579,9 @@ public:
             StringRef C = Annot.slice(15, Annot.size());
             if (C != "1") // Avoid printing trivial constraints
               FoundConstraints.push_back(C);
-          } else if (Kind == Union && Annot.startswith("c3d_case:")) {
+          } else if (Annot.startswith("c3d_case:")) {
             FoundCase.push_back(Annot.slice(9, Annot.size()));
-          } else if (Kind == Union && Annot == "c3d_default") {
+          } else if (Annot == "c3d_default") {
             // GM: FIXME: locations are wrong for c3d_default, but
             // has no payload, so fix that here.
             End = AA->getRange().getEnd().getLocWithOffset(9);
@@ -1604,6 +1628,10 @@ public:
                 "'case' and 'default' attributes cannot be mixed");
       assert((Kind != Union || FoundDefault || FoundCase.size() > 0) &&
                 "Every union field needs either a case or a default marker");
+      assert((FoundCase.size() == 0 || Kind == Union) &&
+                "everparse::case attributes can only be used for union members");
+      assert((!FoundDefault || Kind == Union) &&
+                "everparse::default attributes can only be used for union members");
 
       Out << "  ";
 
@@ -1664,6 +1692,11 @@ public:
 
       /* Print the field name */
       Out << F->getName();
+
+      /* Print bitwidth if any */
+      if (F->isBitField()) {
+          Out << ":" << F->getBitWidthValue(AC);
+      }
 
       /* Print byte size if any (TODO: check this is actually an array */
       switch (ArrayKind) {

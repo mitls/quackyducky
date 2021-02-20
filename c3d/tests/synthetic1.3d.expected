@@ -1,0 +1,172 @@
+UINT32 enum _c3danonenum0 {
+  V2 = 2,
+  V3 = 3,
+  V4 = 4,
+  V5 = 5,
+  V6 = 6,
+  V7 = 7,
+  V8 = 8,
+  V9 = 9,
+}
+typedef uint32_t UINT32_Alias1;
+
+typedef uint32_t UINT32_Alias2;
+
+typedef uint32_t UINT32_Alias3;
+
+typedef uint32_t UINT32_Alias4;
+
+typedef uint32_t UINT32_Alias5;
+
+typedef uint32_t ULONG;
+
+typedef struct _STRUCT_1 (uint32_t Len)
+where (Len == sizeof (this))
+ { 
+  UINT32_Alias1 f1;
+  uint32_t f2;
+  uint32_t f3;
+  uint32_t f4;
+} STRUCT_1, *PSTRUCT_1;
+
+typedef struct _STRUCT_2 (uint32_t Len)
+where (Len == sizeof (this))
+ { 
+  UINT32_Alias3 len;
+  STRUCT_1(len) field_1;
+} STRUCT_2, *PSTRUCT_2;
+
+typedef struct _STRUCT_3 (uint32_t TotalLen) { 
+  UINT32_Alias1 f1;
+  UINT32_Alias2 f2;
+  ULONG len;
+  uint32_t offset { is_range_okay(TotalLen, offset, len) && offset >= sizeof (this) } ;
+  UINT32_Alias4 f4 { f4 == 0 } ;
+  uint8_t buffer[:byte-size (TotalLen - sizeof (this))];
+} STRUCT_3, *PSTRUCT_3;
+
+UINT32 enum _c3danonenum1 {
+  TAG_STRUCT_1 = 0,
+  TAG_STRUCT_2 = 2,
+  TAG_STRUCT_3 = 3,
+}
+casetype _UNION_1 (uint32_t Tag, uint32_t TotalLen) { 
+ switch (Tag) {
+  case TAG_STRUCT_1: 
+    STRUCT_1(TotalLen) struct1;
+  case TAG_STRUCT_2: 
+    STRUCT_2(TotalLen) struct2;
+  case TAG_STRUCT_3: 
+    STRUCT_3(TotalLen) struct3;
+  default: 
+    unit empty;
+ }
+} UNION_1, *PUNION_1;
+
+entrypoint
+typedef struct _CONTAINER_1 { 
+  uint32_t Tag;
+  uint32_t MessageLength { MessageLength >= sizeof (this) } ;
+  UNION_1(Tag, MessageLength - sizeof (this)) union_;
+} CONTAINER_1, *PCONTAINER_1;
+
+entrypoint
+typedef struct _HEADER (uint32_t PLen, uint32_t HLen, mutable uint32_t * offset1, mutable uint32_t * len1, mutable uint32_t * offset2, mutable uint32_t * len2)
+where (sizeof (this) <= HLen && HLen <= PLen)
+ { 
+  uint32_t Offset1 { sizeof (this) <= Offset1 } 
+    {:on-success 
+{
+    *offset1 = Offset1;
+    return 1;
+}
+
+    };
+  uint32_t Len1 { is_range_okay(PLen, Offset1, Len1) } 
+    {:on-success 
+{
+    *len1 = Len1;
+    return 1;
+}
+
+    };
+  uint32_t Dummy { Dummy == 0 } ;
+  uint32_t Offset2
+    {:on-success 
+{
+    *offset2 = Offset2;
+    return 1;
+}
+
+    };
+  uint32_t Len2 { !(Offset2 != 0 || Len2 != 0) || (is_range_okay(HLen, Offset2, Len2) && Offset2 >= sizeof (this) && Offset2 + Len2 <= Offset2) } 
+    {:on-success 
+{
+    *len2 = Len2;
+    return 1;
+}
+
+    };
+  UINT32_Alias1 Dummy2 { Dummy2 == 0 } ;
+  UINT32_Alias1 Dummy3;
+} HEADER, *PHEADER;
+
+typedef struct _BITFIELD0 (uint32_t Bound) { 
+  ULONG bit_0:1;
+  ULONG bit_1:1;
+  ULONG bit_2:1;
+  ULONG bit_3:1;
+  ULONG bit_4:1;
+  ULONG bit_5_16:11 { bit_5_16 < 2000 } ;
+  ULONG bit_16_26:10 { bit_16_26 < 2000 && bit_5_16 + bit_16_26 <= Bound } ;
+} BITFIELD0, *PBITFIELD0;
+
+typedef struct _BITIFIELD1 (uint32_t Bound) { 
+  ULONG bit_0:1;
+  ULONG bit_1:1;
+  ULONG bit_2:1;
+  ULONG bit_3:1;
+  ULONG bit_4:1;
+  ULONG bit_5_16:11 { bit_5_16 < 2000 } ;
+  ULONG bit_16_26:10 { bit_16_26 < 2000 && bit_5_16 + bit_16_26 <= Bound } ;
+} BITIFIELD1, *PBITIFIELD1;
+
+typedef struct _BITIFIELD2 (uint32_t Bound) { 
+  ULONG bit_0_8:8;
+  ULONG bit_8_16:8 { bit_8_16 <= 220 } ;
+  ULONG bit_16_24:8 { bit_16_24 == 0 || (bit_16_24 * 4 + 91 + 113 <= Bound) } ;
+  ULONG bit_24_32:8 { (bit_24_32 == 0 || (bit_24_32 * 4 + 91 + 113 <= Bound)) && (bit_24_32 == 0 || (bit_16_24 * 4 + 91 + 113 + bit_0_8 <= Bound)) } ;
+} BITIFIELD2, *PBITIFIELD2;
+
+casetype _UNION2 (uint32_t Tag, uint32_t Len, mutable uint32_t * Out0, mutable uint32_t * Out1, mutable uint32_t * Out2) { 
+ switch (Len) {
+  case 0: 
+    BITFIELD0(Len) bf0
+    {:on-success 
+{
+    *Out0 = 42;
+    return 1;
+}
+
+    };
+  case 1: 
+    BITFIELD0(Len) bf1
+    {:on-success 
+{
+    *Out1 = 42;
+    return 1;
+}
+
+    };
+  case 2: 
+    BITFIELD0(Len) bf2
+    {:on-success 
+{
+    *Out2 = 42;
+    return 1;
+}
+
+    };
+ }
+} UNION2, *PUNION2;
+

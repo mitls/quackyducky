@@ -1,0 +1,4 @@
+*.3d
+*.preprocessed.h
+*.check
+*.err

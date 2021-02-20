@@ -1,0 +1,23 @@
+entrypoint
+typedef struct _POINT3 { 
+  uint32_t x[:byte-size (3) * sizeof (uint32_t)];
+} POINT3, *PPOINT3;
+
+entrypoint
+typedef struct _POINTNPARAM (uint32_t len) { 
+  uint8_t dummy;
+  uint32_t x[:byte-size (len)];
+} POINTNPARAM, *PPOINTNPARAM;
+
+entrypoint
+typedef struct _POINTNPARAM2 (uint32_t len) { 
+  uint8_t dummy
+    {:on-success 
+{
+    return (dummy < 25);
+}
+
+    };
+  uint32_t x[:byte-size-at-most (len)];
+} POINTNPARAM2, *PPOINTNPARAM2;
+

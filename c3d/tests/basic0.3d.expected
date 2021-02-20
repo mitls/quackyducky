@@ -1,0 +1,10 @@
+entrypoint
+typedef struct _BAR (uint32_t MessageBodyLength)
+where (MessageBodyLength == sizeof (this))
+ { 
+  BAR_ID RequestId;
+  uint32_t MajorVersion { MajorVersion == 123 && MajorVersion == 0 } ;
+  uint32_t MinorVersion { (MinorVersion == MajorVersion) && (MinorVersion == 1) } ;
+  uint32_t MaxTransferSize { MaxTransferSize <= MessageBodyLength } ;
+} BAR, *PBAR;
+
