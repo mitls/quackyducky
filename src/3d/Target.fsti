@@ -108,8 +108,7 @@ noeq
 type struct_field = {
   sf_dependence: bool;
   sf_ident: A.ident;
-  sf_typ: field_typ;
-  sf_field_number:option A.field_num
+  sf_typ: field_typ
 }
 
 type field = struct_field
@@ -162,9 +161,9 @@ type parser' =
   | Parse_t_exact   : n:expr -> t:parser -> parser'
   | Parse_pair      : n1: A.ident -> p:parser -> q:parser -> parser'
   | Parse_dep_pair  : n1: A.ident -> p:parser -> k:lam parser -> parser'
-  | Parse_dep_pair_with_refinement: n1: A.ident -> f1: A.field_num -> dfst:parser -> refinement:lam expr -> dsnd:lam parser -> parser'
+  | Parse_dep_pair_with_refinement: n1: A.ident -> dfst:parser -> refinement:lam expr -> dsnd:lam parser -> parser'
   | Parse_dep_pair_with_action: dfst:parser -> a:lam action -> dsnd:lam parser -> parser'
-  | Parse_dep_pair_with_refinement_and_action: n1: A.ident -> f1: A.field_num -> dfst:parser -> refinement:lam expr -> a:lam action -> dsnd:lam parser -> parser'
+  | Parse_dep_pair_with_refinement_and_action: n1: A.ident -> dfst:parser -> refinement:lam expr -> a:lam action -> dsnd:lam parser -> parser'
   | Parse_map       : p:parser -> f:lam expr -> parser'
   | Parse_refinement: n:A.ident -> p:parser -> f:lam expr -> parser'
   | Parse_refinement_with_action : n:A.ident -> p:parser -> f:lam expr -> a:lam action -> parser'
@@ -174,14 +173,15 @@ type parser' =
   | Parse_weaken_right: p:parser ->  k:parser_kind -> parser'
   | Parse_if_else   : e:expr -> parser -> parser -> parser'
   | Parse_impos     : parser'
-  | Parse_with_error: f:A.field_num -> parser -> parser'
   | Parse_with_comment: p:parser -> c:A.comments -> parser'
   | Parse_string    : p:parser -> zero:expr -> parser'
 
 and parser = {
   p_kind:parser_kind;
   p_typ:typ;
-  p_parser:parser'
+  p_parser:parser';
+  p_typename: A.ident;
+  p_fieldname: string;
 }
 
 noeq
@@ -194,29 +194,141 @@ type reader =
 
 noeq
 type validator' =
-  | Validate_return   : validator'
-  | Validate_app      : hd:A.ident -> args:list index -> validator'
-  | Validate_nlist    : n:expr -> v:validator -> validator'
-  | Validate_nlist_constant_size_without_actions : n:expr -> v:validator -> validator'
-  | Validate_t_at_most : n:expr -> v:validator -> validator'
-  | Validate_t_exact : n:expr -> v:validator -> validator'
-  | Validate_pair      : n1: A.ident -> v1:validator -> v2:validator -> validator'
-  | Validate_dep_pair : n1: A.ident -> v:validator -> r:reader -> k:lam validator -> validator'
-  | Validate_dep_pair_with_refinement: p1_is_constant_size_without_actions: bool -> n1: A.ident -> f1: A.ident -> dfst:validator -> r:reader -> refinement:lam expr -> dsnd:lam validator -> validator'
-  | Validate_dep_pair_with_action: dfst:validator -> r:reader -> a:lam action -> dsnd:lam validator -> validator'
-  | Validate_dep_pair_with_refinement_and_action: p1_is_constant_size_without_actions: bool -> n1: A.ident -> f1: A.ident -> dfst:validator -> r:reader -> refinement:lam expr -> a:lam action -> dsnd:lam validator -> validator'
-  | Validate_map      : p:validator -> f:lam expr -> validator'
-  | Validate_refinement: n:A.ident -> v:validator -> r:reader -> f:lam expr -> validator'
-  | Validate_refinement_with_action : n:A.ident -> v:validator -> r:reader -> f:lam expr -> a:lam action -> validator'
-  | Validate_with_dep_action   : name:A.ident -> v:validator -> r:reader -> a:lam action -> validator'
-  | Validate_with_action: name:A.ident -> v:validator -> a:action -> validator'
-  | Validate_weaken_left : v:validator ->  k:parser_kind -> validator'
-  | Validate_weaken_right : v:validator ->  k:parser_kind -> validator'
-  | Validate_if_else  : e:expr -> validator -> validator -> validator'
-  | Validate_impos    : validator'
-  | Validate_with_error: f:A.ident (* field identifier obtained by Binding.lookup_field_num *) -> validator -> validator'
-  | Validate_with_comment: v:validator -> c:A.comments -> validator'
-  | Validate_string: v:validator -> r:reader -> zero:expr -> validator'
+  | Validate_return:
+    validator'
+
+  | Validate_app:
+    hd:A.ident ->
+    args:list index ->
+    validator'
+
+  | Validate_nlist:
+    n:expr ->
+    v:validator ->
+    validator'
+
+  | Validate_nlist_constant_size_without_actions:
+    n:expr ->
+    v:validator ->
+    validator'
+
+  | Validate_t_at_most:
+    n:expr ->
+    v:validator ->
+    validator'
+
+  | Validate_t_exact:
+    n:expr ->
+    v:validator ->
+    validator'
+
+  | Validate_pair:
+    n1:A.ident ->
+    v1:validator ->
+    v2:validator ->
+    validator'
+
+  | Validate_dep_pair:
+    n1:A.ident ->
+    v:validator ->
+    r:reader ->
+    k:lam validator ->
+    validator'
+
+  | Validate_dep_pair_with_refinement:
+    p1_is_constant_size_without_actions:bool ->
+    n1:A.ident ->
+    dfst:validator ->
+    r:reader ->
+    refinement:lam expr ->
+    dsnd:lam validator ->
+    validator'
+
+  | Validate_dep_pair_with_action:
+    dfst:validator ->
+    r:reader ->
+    a:lam action ->
+    dsnd:lam validator ->
+    validator'
+
+  | Validate_dep_pair_with_refinement_and_action:
+    p1_is_constant_size_without_actions:bool ->
+    n1:A.ident ->
+    dfst:validator ->
+    r:reader ->
+    refinement:lam expr ->
+    a:lam action ->
+    dsnd:lam validator ->
+    validator'
+
+  | Validate_map:
+    p:validator ->
+    f:lam expr ->
+    validator'
+
+  | Validate_refinement:
+    n:A.ident ->
+    v:validator ->
+    r:reader ->
+    f:lam expr ->
+    validator'
+
+  | Validate_refinement_with_action:
+    n:A.ident ->
+    v:validator ->
+    r:reader ->
+    f:lam expr ->
+    a:lam action ->
+    validator'
+
+  | Validate_with_dep_action:
+    name:A.ident ->
+    v:validator ->
+    r:reader ->
+    a:lam action ->
+    validator'
+
+  | Validate_with_action:
+    name:A.ident ->
+    v:validator ->
+    a:action ->
+    validator'
+
+  | Validate_weaken_left:
+    v:validator ->
+    k:parser_kind ->
+    validator'
+
+  | Validate_weaken_right:
+    v:validator ->
+    k:parser_kind ->
+    validator'
+
+  | Validate_if_else:
+    e:expr ->
+    validator ->
+    validator ->
+    validator'
+
+  | Validate_impos:
+    validator'
+
+  | Validate_with_error_handler:
+    typename:A.ident ->
+    fieldname:string ->
+    v:validator ->
+    validator'
+
+  | Validate_with_comment:
+    v:validator ->
+    c:A.comments ->
+    validator'
+
+  | Validate_string:
+    v:validator ->
+    r:reader ->
+    zero:expr ->
+    validator'
 
 and validator = {
   v_allow_reading: bool;
@@ -237,6 +349,8 @@ type type_decl = {
 
 let definition = A.ident * list param * typ * expr
 
+let assumption = A.ident * typ
+
 type decl_attributes = {
   is_hoisted: bool;
   is_exported: bool;
@@ -246,11 +360,13 @@ type decl_attributes = {
 
 noeq
 type decl' =
+  | Assumption : assumption -> decl'
   | Definition : definition -> decl' //the bool marks it for inline_for_extraction
   | Type_decl : type_decl -> decl'
 
 let decl = decl' * decl_attributes
 
+val error_handler_decl : decl
 val print_typ (mname:string) (t:typ) : ML string //(decreases t)
 val print_decls (modul: string) (ds:list decl) : ML string
 val print_types_decls (modul: string) (ds:list decl) : ML string

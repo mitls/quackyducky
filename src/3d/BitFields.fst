@@ -66,9 +66,9 @@ let coalesce_grouped_bit_field env (f:bitfield_group)
       | Some (Inr bf) -> bf.v
       | _ -> failwith "Must have elaborated bitfield"
     in
-    let field_dependence, field_constraint, field_num, subst =
+    let field_dependence, field_constraint, subst =
       List.fold_left
-        (fun (dep, acc_constraint, num, subst) f ->
+        (fun (dep, acc_constraint, subst) f ->
           let f = f.v in
           let dep = dep || f.field_dependence in
           let acc_constraint =
@@ -85,8 +85,8 @@ let coalesce_grouped_bit_field env (f:bitfield_group)
               mk_e (Constant (Int UInt32 (bitfield_attrs f).bitfield_to))]
           in
           let subst = (f.field_ident, mk_e bf_exp) :: subst in
-          dep, acc_constraint, f.field_number, subst)
-       (false, None, None, [])
+          dep, acc_constraint, subst)
+       (false, None, [])
        fields
     in
     let struct_field = {
@@ -95,7 +95,6 @@ let coalesce_grouped_bit_field env (f:bitfield_group)
       field_type = typ;
       field_array_opt = FieldScalar;
       field_constraint = field_constraint;
-      field_number = field_num;
       field_bitwidth = None;
       field_action = None; //TODO conjunction of all actions on individual fields?
     } in

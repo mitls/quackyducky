@@ -53,6 +53,35 @@ let rec parser_kind_eq k k' =
     && parser_kind_eq k2 k2'
   | _ -> false
 
+// Some constants
+
+let default_attrs = {
+    is_hoisted = false;
+    is_exported = false;
+    should_inline = false;
+    comments = []
+}
+
+let error_handler_name =
+  let open A in
+  let id' = {
+    modul_name = None;
+    name = "handle_error";
+  } in
+  let id = with_range id' dummy_range in
+  id
+  
+let error_handler_decl =
+  let open A in
+  let error_handler_id' = {
+    modul_name = Some "Actions";
+    name = "error_handler"
+  } in
+  let error_handler_id = with_range error_handler_id' dummy_range in
+  let typ = T_app error_handler_id [] in
+  let a = Assumption (error_handler_name, typ) in
+  a, default_attrs
+
 ////////////////////////////////////////////////////////////////////////////////
 // Printing the target AST in F* concrete syntax
 ////////////////////////////////////////////////////////////////////////////////
@@ -360,8 +389,8 @@ let rec print_parser (mname:string) (p:parser) : ML string = //(decreases p) =
     Printf.sprintf "(%s `parse_dep_pair` %s)"
       (print_parser mname p1)
       (print_lam (print_parser mname) p2)
-  | Parse_dep_pair_with_refinement _ _ p1 e p2
-  | Parse_dep_pair_with_refinement_and_action _ _ p1 e _ p2 ->
+  | Parse_dep_pair_with_refinement _ p1 e p2
+  | Parse_dep_pair_with_refinement_and_action _ p1 e _ p2 ->
     Printf.sprintf "((%s `parse_filter` %s) `parse_dep_pair` %s)"
                    (print_parser mname p1)
                    (print_expr_lam mname e)
@@ -385,7 +414,6 @@ let rec print_parser (mname:string) (p:parser) : ML string = //(decreases p) =
       (print_parser mname p1)
       (print_parser mname p2)
   | Parse_impos -> "(parse_impos())"
-  | Parse_with_error _ p
   | Parse_with_dep_action _ p _
   | Parse_with_action _ p _
   | Parse_with_comment p _ -> print_parser mname p
@@ -448,58 +476,83 @@ let rec print_validator (mname:string) (v:validator) : ML string = //(decreases 
   in
   match v.v_validator with
   | Validate_return ->
-    Printf.sprintf "validate_ret"
+    "validate_ret"
+
   | Validate_app hd args ->
-    Printf.sprintf "(validate_eta (%svalidate_%s %s))" (maybe_mname_prefix mname hd) (print_ident hd) (String.concat " " (print_indexes mname args))
+    Printf.sprintf "(validate_eta (%svalidate_%s %s))"
+                   (maybe_mname_prefix mname hd)
+                   (print_ident hd)
+                   (String.concat " " (print_indexes mname args))
+
   | Validate_nlist e p ->
-    Printf.sprintf "(validate_nlist %s %s)" (print_expr mname e) (print_validator mname p)
+    Printf.sprintf "(validate_nlist %s %s)"
+                   (print_expr mname e)
+                   (print_validator mname p)
+
   | Validate_t_at_most e p ->
-    Printf.sprintf "(validate_t_at_most %s %s)" (print_expr mname e) (print_validator mname p)
+    Printf.sprintf "(validate_t_at_most %s %s)"
+                   (print_expr mname e)
+                   (print_validator mname p)
+
   | Validate_t_exact e p ->
-    Printf.sprintf "(validate_t_exact %s %s)" (print_expr mname e) (print_validator mname p)
+    Printf.sprintf "(validate_t_exact %s %s)"
+                   (print_expr mname e)
+                   (print_validator mname p)
+
   | Validate_nlist_constant_size_without_actions e p ->
     let n_is_const = match fst e with
     | Constant (A.Int _ _) -> true
     | _ -> false
     in
-    Printf.sprintf "(validate_nlist_constant_size_without_actions %s %s %s)" (if n_is_const then "true" else "false") (print_expr mname e) (print_validator mname p)
+    Printf.sprintf "(validate_nlist_constant_size_without_actions %s %s %s)"
+                   (if n_is_const then "true" else "false")
+                   (print_expr mname e)
+                   (print_validator mname p)
+
   | Validate_pair n1 p1 p2 ->
-    Printf.sprintf "(validate_pair \"%s\" %s %s)" (print_maybe_qualified_ident mname n1) (print_validator mname p1) (print_validator mname p2)
+    Printf.sprintf "(validate_pair \"%s\" %s %s)"
+                   (print_maybe_qualified_ident mname n1)
+                   (print_validator mname p1)
+                   (print_validator mname p2)
+
   | Validate_dep_pair n1 p1 r p2 ->
     Printf.sprintf "(validate_dep_pair \"%s\" %s %s %s)"
-      (print_ident n1)
-      (print_validator mname p1)
-      (print_reader mname r)
-      (print_lam (print_validator mname) p2)
-  | Validate_dep_pair_with_refinement p1_is_constant_size_without_actions n1 f1 p1 r e p2 ->
-    Printf.sprintf "(validate_dep_pair_with_refinement %s \"%s\" %s %s %s %s %s)"
-      (if p1_is_constant_size_without_actions then "true" else "false")
-      (print_maybe_qualified_ident mname n1)
-      (print_field_id_name f1)
-      (print_validator mname p1)
-      (print_reader mname r)
-      (print_expr_lam mname e)
-      (print_lam (print_validator mname) p2)
+                   (print_ident n1)
+                   (print_validator mname p1)
+                   (print_reader mname r)
+                   (print_lam (print_validator mname) p2)
+
+  | Validate_dep_pair_with_refinement p1_is_constant_size_without_actions n1 p1 r e p2 ->
+    Printf.sprintf "(validate_dep_pair_with_refinement %s \"%s\" %s %s %s %s)"
+                   (if p1_is_constant_size_without_actions then "true" else "false")
+                   (print_maybe_qualified_ident mname n1)
+                   (print_validator mname p1)
+                   (print_reader mname r)
+                   (print_expr_lam mname e)
+                   (print_lam (print_validator mname) p2)
+
   | Validate_dep_pair_with_action p1 r a p2 ->
     Printf.sprintf "(validate_dep_pair_with_action %s %s %s %s)"
-      (print_validator mname p1)
-      (print_reader mname r)
-      (print_lam (print_action mname) a)
-      (print_lam (print_validator mname) p2)
-  | Validate_dep_pair_with_refinement_and_action p1_is_constant_size_without_actions n1 f1 p1 r e a p2 ->
-    Printf.sprintf "(validate_dep_pair_with_refinement_and_action %s \"%s\" %s %s %s %s %s %s)"
-      (if p1_is_constant_size_without_actions then "true" else "false")
-      (print_maybe_qualified_ident mname n1)
-      (print_field_id_name f1)
-      (print_validator mname p1)
-      (print_reader mname r)
-      (print_expr_lam mname e)
-      (print_lam (print_action mname) a)
-      (print_lam (print_validator mname) p2)
+                   (print_validator mname p1)
+                   (print_reader mname r)
+                   (print_lam (print_action mname) a)
+                   (print_lam (print_validator mname) p2)
+
+  | Validate_dep_pair_with_refinement_and_action p1_is_constant_size_without_actions n1 p1 r e a p2 ->
+    Printf.sprintf "(validate_dep_pair_with_refinement_and_action %s \"%s\" %s %s %s %s %s)"
+                   (if p1_is_constant_size_without_actions then "true" else "false")
+                   (print_maybe_qualified_ident mname n1)
+                   (print_validator mname p1)
+                   (print_reader mname r)
+                   (print_expr_lam mname e)
+                   (print_lam (print_action mname) a)
+                   (print_lam (print_validator mname) p2)
+
   | Validate_map p1 e ->
     Printf.sprintf "(%s `validate_map` %s)"
-      (print_validator mname p1)
-      (print_expr_lam mname e)
+                   (print_validator mname p1)
+                   (print_expr_lam mname e)
+
   | Validate_refinement n1 p1 r e ->
     begin
       if is_unit_validator p1
@@ -512,53 +565,77 @@ let rec print_validator (mname:string) (v:validator) : ML string = //(decreases 
                           (print_reader mname r)
                           (print_expr_lam mname e)
     end
+
   | Validate_refinement_with_action n1 p1 r e a ->
     Printf.sprintf "(validate_filter_with_action \"%s\" %s %s %s
                                             \"reading field value\" \"checking constraint\"
                                             %s)"
-                          (print_maybe_qualified_ident mname n1)
-                          (print_validator mname p1)
-                          (print_reader mname r)
-                          (print_expr_lam mname e)
-                          (print_lam (print_action mname) a)
+                   (print_maybe_qualified_ident mname n1)
+                   (print_validator mname p1)
+                   (print_reader mname r)
+                   (print_expr_lam mname e)
+                   (print_lam (print_action mname) a)
+
   | Validate_with_action name v a ->
     Printf.sprintf "(validate_with_success_action \"%s\" %s %s)"
-      (print_maybe_qualified_ident mname name)
-      (print_validator mname v)
-      (print_action mname a)
+                   (print_maybe_qualified_ident mname name)
+                   (print_validator mname v)
+                   (print_action mname a)
+
   | Validate_with_dep_action n v r a ->
     Printf.sprintf "(validate_with_dep_action \"%s\" %s %s %s)"
-      (print_maybe_qualified_ident mname n)
-      (print_validator mname v)
-      (print_reader mname r)
-      (print_lam (print_action mname) a)
+                   (print_maybe_qualified_ident mname n)
+                   (print_validator mname v)
+                   (print_reader mname r)
+                   (print_lam (print_action mname) a)
+
   | Validate_weaken_left p1 k ->
-    Printf.sprintf "(validate_weaken_left %s _)" (print_validator mname p1) // (print_kind mname k)
+    Printf.sprintf "(validate_weaken_left %s _)"
+                   (print_validator mname p1)
+
   | Validate_weaken_right p1 k ->
-    Printf.sprintf "(validate_weaken_right %s _)" (print_validator mname p1) // (print_kind mname k)
+    Printf.sprintf "(validate_weaken_right %s _)"
+                   (print_validator mname p1)
+
   | Validate_if_else e v1 v2 ->
     Printf.sprintf "(validate_ite %s (fun _ -> %s) (fun _ -> %s) (fun _ -> %s) (fun _ -> %s))"
-      (print_expr mname e)
-      (print_parser mname v1.v_parser)
-      (print_validator mname v1)
-      (print_parser mname v2.v_parser)
-      (print_validator mname v2)
-  | Validate_impos -> "(validate_impos())"
-  | Validate_with_error fn v ->
-    Printf.sprintf "(validate_with_error %s %s)" (print_field_id_name fn) (print_validator mname v)
+                   (print_expr mname e)
+                   (print_parser mname v1.v_parser)
+                   (print_validator mname v1)
+                   (print_parser mname v2.v_parser)
+                   (print_validator mname v2)
+
+  | Validate_impos ->
+    "(validate_impos())"
+
+  | Validate_with_error_handler typename fieldname v ->
+    Printf.sprintf "(validate_with_error_handler \"%s\" \"%s\" %s)"
+                   (print_maybe_qualified_ident mname typename)
+                   fieldname
+                   (print_validator mname v)
+
   | Validate_with_comment v c ->
     let c = String.concat "\n" c in
     Printf.sprintf "(validate_with_comment \"%s\" %s)"
-      c
-      (print_validator mname v)
+                   c
+                   (print_validator mname v)
+
   | Validate_string velem relem zero ->
-    Printf.sprintf "(validate_string %s %s %s)" (print_validator mname velem) (print_reader mname relem) (print_expr mname zero)
+    Printf.sprintf "(validate_string %s %s %s)" 
+                   (print_validator mname velem)
+                   (print_reader mname relem)
+                   (print_expr mname zero)
 
 let print_typedef_name (mname:string) (tdn:typedef_name) : ML string =
   Printf.sprintf "%s %s"
-    (print_ident tdn.td_name)
-    (String.concat " "
-      (List.map (fun (id, t) -> Printf.sprintf "(%s:%s)" (print_ident id) (print_typ mname t)) tdn.td_params))
+                 (print_ident tdn.td_name)
+                 (String.concat " "
+                   (List.map 
+                     (fun (id, t) -> 
+                       Printf.sprintf "(%s:%s)"
+                                      (print_ident id)
+                                      (print_typ mname t))
+                     tdn.td_params))
 
 let print_typedef_typ (tdn:typedef_name) : ML string =
   Printf.sprintf "%s %s"
@@ -571,11 +648,10 @@ let print_typedef_body (mname:string) (b:typedef_body) : ML string =
   | TD_abbrev t -> print_typ mname t
   | TD_struct fields ->
     let print_field (sf:field) : ML string =
-        Printf.sprintf "%s : %s%s%s"
+        Printf.sprintf "%s : %s%s"
           (print_ident sf.sf_ident)
           (print_typ mname sf.sf_typ)
           (if sf.sf_dependence then " (*dep*)" else "")
-          (match sf.sf_field_number with | None -> "" | Some n -> Printf.sprintf "(* %d *)" n)
     in
     let fields = String.concat ";\n" (List.map print_field fields) in
     Printf.sprintf "{\n%s\n}" fields
@@ -647,6 +723,8 @@ let maybe_print_type_equality (mname:string) (td:type_decl) : ML string =
 
 let print_decl_for_types (mname:string) (d:decl) : ML string =
   match fst d with
+  | Assumption _ -> ""
+  
   | Definition (x, [], T_app ({Ast.v={Ast.name="field_id"}}) _, (Constant c, _)) ->
     Printf.sprintf "[@(CMacro)%s]\nlet %s = %s <: Tot field_id by (FStar.Tactics.trivial())\n\n"
      (print_comments (snd d).comments)
@@ -694,6 +772,12 @@ let is_type_abbreviation (td:type_decl) : bool =
 let print_decl_for_validators (mname:string) (d:decl) : ML string =
   match fst d with
   | Definition _ -> ""
+  
+  | Assumption (x, t) ->
+    Printf.sprintf "assume\nval %s : %s\n\n"
+      (print_ident x)      
+      (print_typ mname t) 
+
   | Type_decl td ->
     (if false //not td.decl_name.td_entrypoint
      then ""
@@ -778,6 +862,7 @@ let print_type_decl_signature (mname:string) (d:decl{Type_decl? (fst d)}) : ML s
 
 let print_decl_signature (mname:string) (d:decl) : ML string =
   match fst d with
+  | Assumption _
   | Definition _ -> ""
   | Type_decl td ->
     if (snd d).is_hoisted
@@ -839,42 +924,6 @@ let print_decls_signature (mname: string) (ds:list decl) =
   // in
   decls // ^ "\n" ^ dummy
 
-let print_error_map (modul: string) (env: global_env) : ML (string & string) =
-  let errs = Binding.all_nums env in
-  let struct_names =
-    List.map
-    (fun (kis: (A.field_num * option A.ident * string)) ->
-      let k, i, s = kis in
-      Printf.sprintf "case %d: return \"%s\";"
-        k
-        (match i with
-         | None -> ""
-         | Some i -> A.print_ident i))
-    errs
- in
- let field_names =
-    List.map
-    (fun (kis: (A.field_num * option A.ident * string)) ->
-      let k, i, s = kis in
-      Printf.sprintf "case %d: return \"%s\";"
-        k s)
-    errs
- in
- let print_switch fname cases =
-   Printf.sprintf
-     "static char* %s%s(uint64_t err) {\n\t\
-        switch (EverParseFieldIdOfResult(err)) {\n\t\t\
-          %s \n\t\t\
-          default: return \"\";\n\t\
-       }\n\
-      }\n"
-      modul
-      fname
-      (String.concat "\n\t\t" cases)
- in
- print_switch "StructNameOfErr" struct_names,
- print_switch "FieldNameOfErr" field_names
-
 #push-options "--z3rlimit_factor 4"
 let rec print_as_c_type (t:typ) : Tot string =
     let open Ast in
@@ -933,16 +982,77 @@ let pascal_case name : ML string =
 let print_c_entry (modul: string)
                   (env: global_env)
                   (ds:list decl)
-: ML (string & string)
-= let struct_name_map, field_name_map = print_error_map modul env in
-
-  let print_one_validator (d:type_decl) : ML (string & string) =
+    : ML (string & string)
+    =  let default_error_handler =
+         "typedef struct _ErrorFrame\n\
+          {\n\t\
+             BOOLEAN filled;\n\t\
+             uint32_t start_pos;\n\t\
+             uint32_t end_pos;\n\t\
+             const char *typename;\n\t\
+             const char *fieldname;\n\t\
+             const char *reason;\n\
+          } ErrorFrame;\n\
+          \n\
+          void DefaultErrorHandler(\n\t\
+                              const char *typename,\n\t\
+                              const char *fieldname,\n\t\
+                              const char *reason,\n\t\
+                              uint8_t *context,\n\t\
+                              uint32_t len,\n\t\
+                              uint8_t *base,\n\t\
+                              uint64_t start_pos,\n\t\
+                              uint64_t end_pos)\n\
+          {\n\t\
+            ErrorFrame *frame = (ErrorFrame*)context;\n\t\
+            if (!frame->filled)\n\t\
+            {\n\t\t\
+              frame->filled = TRUE;\n\t\t\
+              frame->start_pos = start_pos;\n\t\t\
+              frame->end_pos = end_pos;\n\t\t\
+              frame->typename = typename;\n\t\t\
+              frame->fieldname = fieldname;\n\t\t\
+              frame->reason = reason;\n\t\
+            }\n\
+          }" 
+   in
+   let wrapped_call name params =
+     Printf.sprintf
+       "ErrorFrame frame;\n\t\
+       frame.filled = FALSE;\n\t\
+       uint64_t result = %s(%s (uint8_t*)&frame, &DefaultErrorHandler, len, base, 0);\n\t\
+       if (EverParseResultIsError(result))\n\t\
+       {\n\t\t\
+         if (frame.filled)\n\t\t\
+         {\n\t\t\t\
+           %sEverParseError(frame.typename, frame.fieldname, frame.reason);\n\t\t\
+         }\n\t\t\
+         return FALSE;\n\t\
+       }\n\t\
+       return TRUE;"
+       name
+       params
+       modul
+   in
+   let print_one_validator (d:type_decl) : ML (string & string) =
     let print_params (ps:list param) : Tot string =
       let params =
         String.concat
           ", "
           (List.Tot.map
             (fun (id, t) -> Printf.sprintf "%s %s" (print_as_c_type t) (print_ident id))
+            ps)
+       in
+       match ps with
+       | [] -> params
+       | _ -> params ^ ", "
+    in
+    let print_arguments (ps:list param) : Tot string =
+      let params =
+        String.concat
+          ", "
+          (List.Tot.map
+            (fun (id, t) -> print_ident id)
             ps)
        in
        match ps with
@@ -967,24 +1077,12 @@ let print_c_entry (modul: string)
        |> pascal_case
     in
     let impl =
-      Printf.sprintf
-      "%s {\n\t\
-         uint64_t result = %s(%s, 0);\n\t\
-         if (EverParseResultIsError(result)) {\n\t\t\
-           %sEverParseError(\n\t\
-                  %sStructNameOfErr(result),\n\t\t\t\
-                  %sFieldNameOfErr (result),\n\t\t\t\
-                  EverParseErrorReasonOfResult(result));\n\t\t\
-           return FALSE;\n\t\
-         }\n\t\
-         return TRUE;\n\
-       }"
-       signature
-       validator_name
-       (((List.Tot.map (fun (id, _) -> print_ident id) d.decl_name.td_params)@["len"; "base"]) |> String.concat ", ")
-       modul
-       modul
-       modul
+      let body = 
+        wrapped_call
+          validator_name 
+          (print_arguments d.decl_name.td_params)
+      in
+      Printf.sprintf "%s {\n\t%s\n}" signature body
     in
     signature ^";",
     impl
@@ -1014,7 +1112,7 @@ let print_c_entry (modul: string)
       (signatures |> String.concat "\n\n")
   in
   let error_callback_proto =
-    Printf.sprintf "void %sEverParseError(char *StructName, char *FieldName, char *Reason);"
+    Printf.sprintf "void %sEverParseError(const char *StructName, const char *FieldName, const char *Reason);"
       modul
   in
   let impl =
@@ -1022,15 +1120,13 @@ let print_c_entry (modul: string)
       "#include \"%sWrapper.h\"\n\
        #include \"EverParse.h\"\n\
        #include \"%s.h\"\n\
-       %s\n\
-       %s\n\
-       %s\n\
+       %s\n\n\
+       %s\n\n\
        %s\n"
       modul
       modul
       error_callback_proto
-      struct_name_map
-      field_name_map
+      default_error_handler
       (impls |> String.concat "\n\n")
   in
   header,

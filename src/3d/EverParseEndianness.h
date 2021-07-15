@@ -33,7 +33,7 @@ extern "C" {
 #include <string.h>
 #include <stdint.h>
 
-typedef char * const EverParseString;
+typedef const char * EverParseString;
 
 /* ... for Windows (MSVC)... not targeting XBOX 360! */
 #if defined(_MSC_VER)

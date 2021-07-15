@@ -12,7 +12,24 @@ extern "C" {
 
 
 
-uint64_t BfValidateDummy(uint32_t InputLength, uint8_t *Input, uint64_t StartPosition);
+uint64_t
+BfValidateDummy(
+  uint8_t *Ctxt,
+  void
+  (*Err)(
+    EverParseString x0,
+    EverParseString x1,
+    EverParseString x2,
+    uint8_t *x3,
+    uint32_t x4,
+    uint8_t *x5,
+    uint64_t x6,
+    uint64_t x7
+  ),
+  uint32_t Uu,
+  uint8_t *Input,
+  uint64_t StartPosition
+);
 
 void BfReadDummy(uint32_t InputLength, uint8_t *Input, uint32_t StartPosition);
 

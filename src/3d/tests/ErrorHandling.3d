@@ -1,0 +1,17 @@
+typedef struct _T
+{
+   UINT32 x
+   {
+       x >= 17
+   };
+   UINT32 y
+   {
+       y >= x
+   };
+} T;
+
+entrypoint
+typedef struct _S {
+  T t1;
+  T t2;
+} S;

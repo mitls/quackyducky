@@ -640,6 +640,89 @@ using a fully qualified name of the form ``<MODULE NAME>.<IDENTIFIER>``.
 A commented example is available `in the EverParse repository
 <https://github.com/project-everest/everparse/blob/master/src/3d/tests/modules/>`_.
 
+Error handling
+--------------
+
+When a validator fails, EverParse supports invoking a user-provided
+callback with contextual information about the failure.
+
+An error handling callback is a C procedure with the following signature:
+
+.. code-block:: c
+
+  typedef void (*ErrorHandler)(
+    const char *TypeName,
+    const char *FieldName,
+    const char *ErrorReason,
+    uint8_t *Context,
+    uint32_t Length,
+    uint8_t *Base,
+    uint64_t StartPosition,
+    uint64_t EndPosition
+  );
+    
+Every EverParse validator is parameterized by:
+
+* A function pointer, of type ``ErrorHandler``
+* A context parameter, ``uint8_t* Context``
+
+At the top-level, when calling into EverParse from an application, one
+can instantiate both the ``ErrorHandler`` with a function of one's
+choosing and the ``Context`` argument with a pointer to some
+application-specific context.
+
+The ``ErrorHandler`` expects
+
+  * The ``Base`` and ``Context`` pointers to refer to live and
+    disjoint pieces of memory.
+
+  * For ``Length`` to be the length in bytes of valid memory pointed
+    to by ``Base`` and for ``StartPosition <= EndPosition <= Length``.
+
+The ``ErrorHandler`` can
+
+  * Read from all the pointers
+
+  * May only modify the memory reference by ``Context``.
+
+When validating a field ``f`` in a type ``T``, in case the validator
+fails, EverParse calls the user-provided ``ErrorHandler``, passing in
+the following arguments:
+
+  * The ``TypeName`` argument is the name of the type ``T``
+
+  * The ``FieldName`` argument is name of the field ``f``
+
+  * The ``ErrorReason`` argument is one of the following:
+
+    - "generic error"
+    - "not enough data"
+    - "impossible"
+    - "list size not multiple of element size"
+    - "action failed"
+    - "constraint failed"
+    - "unexpected padding"
+    - "unspecified"
+
+  * The ``Context`` argument is the user-provided ``Context`` pointer
+    
+  * The ``Length`` argument is the length in bytes of the input buffer
+
+  * The ``Base`` argument is a pointer to the base of the input buffer
+
+  * The ``StartPosition`` argument is the offset from ``Base`` of the
+    start of the field ``f``
+  
+  * The ``EndPosition`` argument is the offset from ``Base`` of the
+    end of the field ``f`` at which the validation failure occurred.
+                
+Following a validation failure at a given field, EverParse will invoke
+the ``ErrorHandler`` at each enclosing type as well. This allows a
+caller to reconstruct a stack trace of a failing validation.
+
+EverParse generates a default error handler that records just the
+deepest validation failure that occurred.
+
 A fully worked example: TCP Segment Headers
 -------------------------------------------
 
@@ -964,3 +1047,23 @@ of ``base`` represent a valid ``TCPHeader``, while enjoying all the
 guarantees of memory safety, arithmetic safety, double-fetch freedom,
 not modifying any of the caller's memory, not allocating any heap
 data, and being provably functional correct.
+
+Error handling
+..............
+
+``TCPWrapper.h`` includes a default error handler to report the leaf
+validation failure. It also expects a client module to supply an
+implementation of
+
+.. code-block:: c
+
+   void TcpEverParseError(
+        const char *TypeName,
+        const char *FieldName,
+        const char *Reason);
+                
+
+This can be instantiated with a procedure to, say, log an error.
+
+Alternatively, the default error handler in ``TCPWrapper.h`` can be
+replaced by a custom error handler of your choosing.

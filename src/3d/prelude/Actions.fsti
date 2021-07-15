@@ -134,6 +134,21 @@ val validate_with_success_action
       (a:action p1 inv2 l2 b bool)
   : validate_with_action_t p1 (conj_inv inv1 inv2) (l1 `eloc_union` l2) false
 
+
+inline_for_extraction noextract
+val validate_with_error_handler (typename: string)
+                                (fieldname: string)
+                                (#nz: _)
+                                (#wk: _)
+                                (#k1:parser_kind nz wk)
+                                (#t1: _)
+                                (#p1:parser k1 t1)
+                                (#inv1:_)
+                                (#l1:eloc)
+                                (#ar:_)
+                                (v1:validate_with_action_t p1 inv1 l1 ar)
+  : validate_with_action_t p1 inv1 l1 ar
+
 inline_for_extraction noextract
 val validate_with_error_action
       (name: string)
@@ -177,7 +192,6 @@ inline_for_extraction noextract
 val validate_dep_pair_with_refinement_and_action
       (p1_is_constant_size_without_actions: bool)
       (name1: string)
-      (id1: field_id)
       (#nz1:_) (#k1:parser_kind nz1 WeakKindStrongPrefix) (#t1:_) (#p1:parser k1 t1)
       (#inv1:_) (#l1:_) (v1:validate_with_action_t p1 inv1 l1 true) (r1: leaf_reader p1)
       (f: t1 -> bool)
@@ -206,7 +220,6 @@ inline_for_extraction noextract
 val validate_dep_pair_with_refinement
       (p1_is_constant_size_without_actions: bool)
       (name1: string)
-      (id1: field_id)
       (#nz1:_) (#k1:parser_kind nz1 WeakKindStrongPrefix) (#t1:_) (#p1:parser k1 t1)
       (#inv1:_) (#l1:_) (v1:validate_with_action_t p1 inv1 l1 true) (r1: leaf_reader p1)
       (f: t1 -> bool)
@@ -254,11 +267,6 @@ val validate_weaken_right (#nz:_) (#wk: _) (#k:parser_kind nz wk) (#t:_) (#p:par
 inline_for_extraction noextract
 val validate_impos (_:unit)
   : validate_with_action_t (parse_impos ()) true_inv eloc_none true
-
-inline_for_extraction noextract
-val validate_with_error (#nz:_) (#wk: _) (#k:parser_kind nz wk) (#t:_) (#p:parser k t)
-                        (#inv:_) (#l:_) (#allow_reading:bool) (c:field_id) (v:validate_with_action_t p inv l allow_reading)
-  : validate_with_action_t p inv l allow_reading
 
 noextract inline_for_extraction
 val validate_ite (#nz:_) (#wk: _) (#k:parser_kind nz wk) (#a:Type) (#b:Type)

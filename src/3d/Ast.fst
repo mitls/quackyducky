@@ -279,14 +279,6 @@ type qualifier =
 ///   Parameters have a name and are always annoted with their type
 type param =  typ & ident & qualifier
 
-/// field_num: Every field in a struct is assigned a unique identifier
-///   which is then reported in case validation fails. The identifier
-///   has to be suitably small, so that it fits in the 32 bits that
-///   LowParse reserves for both field identifiers and error codes.
-///
-///   We pick this to be 2^16 now. Which is to say that a single en
-let field_num = n:nat{ 0 < n /\ n < pow2 16 }
-
 noeq
 type bitfield_attr' = {
   bitfield_width : int;
@@ -318,7 +310,6 @@ type struct_field = {
   field_type:typ;          //type of the field
   field_array_opt: field_array_t;
   field_constraint:option expr; //refinement constraint
-  field_number:option field_num; //computed; field identifiers, used for error reporting
   field_bitwidth:option field_bitwidth_t;  //bits used for the field; elaborate from Inl to Inr
   field_action:option (action & bool); //boo indicates if the action depends on the field value
 }
@@ -456,7 +447,6 @@ let tuint16 = mk_prim_t "UINT16"
 let tuint32 = mk_prim_t "UINT32"
 let tuint64 = mk_prim_t "UINT64"
 let tunknown = mk_prim_t "?"
-let tfield_id = mk_prim_t "field_id"
 
 let map_opt (f:'a -> ML 'b) (o:option 'a) : ML (option 'b) =
   match o with

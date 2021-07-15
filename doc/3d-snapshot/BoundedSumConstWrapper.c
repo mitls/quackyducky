@@ -1,56 +1,50 @@
 #include "BoundedSumConstWrapper.h"
 #include "EverParse.h"
 #include "BoundedSumConst.h"
-void BoundedSumConstEverParseError(char *StructName, char *FieldName, char *Reason);
-static char* BoundedSumConstStructNameOfErr(uint64_t err) {
-	switch (EverParseFieldIdOfResult(err)) {
-		case 1: return "BF._BF";
-		case 2: return "BF._BF";
-		case 3: return "BF._BF";
-		case 4: return "BF._BF2";
-		case 5: return "BF._BF2";
-		case 6: return "BF._BF2";
-		case 7: return "Base._Pair";
-		case 8: return "Base._Pair";
-		case 9: return "Base._Mine";
-		case 10: return "Base._Mine";
-		case 11: return "BoundedSum._boundedSum";
-		case 12: return "BoundedSum._boundedSum";
-		case 13: return "BoundedSum.mySum";
-		case 14: return "BoundedSumConst._boundedSum";
-		case 15: return "BoundedSumConst._boundedSum"; 
-		default: return "";
-	}
-}
+void BoundedSumConstEverParseError(const char *StructName, const char *FieldName, const char *Reason);
 
-static char* BoundedSumConstFieldNameOfErr(uint64_t err) {
-	switch (EverParseFieldIdOfResult(err)) {
-		case 1: return "x";
-		case 2: return "y";
-		case 3: return "z";
-		case 4: return "x";
-		case 5: return "y";
-		case 6: return "z";
-		case 7: return "first";
-		case 8: return "second";
-		case 9: return "f";
-		case 10: return "g";
-		case 11: return "left";
-		case 12: return "right";
-		case 13: return "bound";
-		case 14: return "left";
-		case 15: return "right"; 
-		default: return "";
+typedef struct _ErrorFrame
+{
+	BOOLEAN filled;
+	uint32_t start_pos;
+	uint32_t end_pos;
+	const char *typename;
+	const char *fieldname;
+	const char *reason;
+} ErrorFrame;
+
+void DefaultErrorHandler(
+	const char *typename,
+	const char *fieldname,
+	const char *reason,
+	uint8_t *context,
+	uint32_t len,
+	uint8_t *base,
+	uint64_t start_pos,
+	uint64_t end_pos)
+{
+	ErrorFrame *frame = (ErrorFrame*)context;
+	if (!frame->filled)
+	{
+		frame->filled = TRUE;
+		frame->start_pos = start_pos;
+		frame->end_pos = end_pos;
+		frame->typename = typename;
+		frame->fieldname = fieldname;
+		frame->reason = reason;
 	}
 }
 
 BOOLEAN BoundedSumConstCheckBoundedSum(uint8_t *base, uint32_t len) {
-	uint64_t result = BoundedSumConstValidateBoundedSum(len, base, 0);
-	if (EverParseResultIsError(result)) {
-		BoundedSumConstEverParseError(
-	BoundedSumConstStructNameOfErr(result),
-			BoundedSumConstFieldNameOfErr (result),
-			EverParseErrorReasonOfResult(result));
+	ErrorFrame frame;
+	frame.filled = FALSE;
+	uint64_t result = BoundedSumConstValidateBoundedSum( (uint8_t*)&frame, &DefaultErrorHandler, len, base, 0);
+	if (EverParseResultIsError(result))
+	{
+		if (frame.filled)
+		{
+			BoundedSumConstEverParseError(frame.typename, frame.fieldname, frame.reason);
+		}
 		return FALSE;
 	}
 	return TRUE;

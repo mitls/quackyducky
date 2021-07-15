@@ -1,38 +1,50 @@
 #include "BFWrapper.h"
 #include "EverParse.h"
 #include "BF.h"
-void BFEverParseError(char *StructName, char *FieldName, char *Reason);
-static char* BFStructNameOfErr(uint64_t err) {
-	switch (EverParseFieldIdOfResult(err)) {
-		case 1: return "BF._BF";
-		case 2: return "BF._BF";
-		case 3: return "BF._BF";
-		case 4: return "BF._BF2";
-		case 5: return "BF._BF2";
-		case 6: return "BF._BF2"; 
-		default: return "";
-	}
-}
+void BFEverParseError(const char *StructName, const char *FieldName, const char *Reason);
 
-static char* BFFieldNameOfErr(uint64_t err) {
-	switch (EverParseFieldIdOfResult(err)) {
-		case 1: return "x";
-		case 2: return "y";
-		case 3: return "z";
-		case 4: return "x";
-		case 5: return "y";
-		case 6: return "z"; 
-		default: return "";
+typedef struct _ErrorFrame
+{
+	BOOLEAN filled;
+	uint32_t start_pos;
+	uint32_t end_pos;
+	const char *typename;
+	const char *fieldname;
+	const char *reason;
+} ErrorFrame;
+
+void DefaultErrorHandler(
+	const char *typename,
+	const char *fieldname,
+	const char *reason,
+	uint8_t *context,
+	uint32_t len,
+	uint8_t *base,
+	uint64_t start_pos,
+	uint64_t end_pos)
+{
+	ErrorFrame *frame = (ErrorFrame*)context;
+	if (!frame->filled)
+	{
+		frame->filled = TRUE;
+		frame->start_pos = start_pos;
+		frame->end_pos = end_pos;
+		frame->typename = typename;
+		frame->fieldname = fieldname;
+		frame->reason = reason;
 	}
 }
 
 BOOLEAN BfCheckDummy(uint8_t *base, uint32_t len) {
-	uint64_t result = BfValidateDummy(len, base, 0);
-	if (EverParseResultIsError(result)) {
-		BFEverParseError(
-	BFStructNameOfErr(result),
-			BFFieldNameOfErr (result),
-			EverParseErrorReasonOfResult(result));
+	ErrorFrame frame;
+	frame.filled = FALSE;
+	uint64_t result = BfValidateDummy( (uint8_t*)&frame, &DefaultErrorHandler, len, base, 0);
+	if (EverParseResultIsError(result))
+	{
+		if (frame.filled)
+		{
+			BFEverParseError(frame.typename, frame.fieldname, frame.reason);
+		}
 		return FALSE;
 	}
 	return TRUE;

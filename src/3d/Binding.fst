@@ -27,54 +27,6 @@ open Ast
 open FStar.All
 module H = Hashtable
 
-/// Generation of unique names for fields:
-noeq
-type field_num_ops_t = {
-  next : (option ident & string) -> ML field_num; //generate an identifier for a field in a struct
-  lookup : field_num -> ML (option (option ident & string)); //look up the identifier
-  all_nums : unit -> ML (list (field_num & option ident & string)) //retrieve a table of identifier/field-name mappings
-}
-
-let mk_field_num_ops () : ML field_num_ops_t =
-  let open FStar.ST in
-  let h : H.t field_num (option ident & string) = H.create 100 in
-  let ctr : ref field_num = alloc 1 in
-  let max_field_num = pow2 16 in
-  let next s
-    : ML field_num
-    = let x = !ctr in
-      H.insert h x s;
-      begin
-      if x + 1 = max_field_num
-      then failwith "Exhausted field numbers"
-      else ctr := x + 1
-      end;
-      x
-  in
-  let lookup (f:field_num)
-    : ML (option (option ident & string))
-    = H.try_find h f
-  in
-  let all_nums () =
-    let entries = H.fold (fun k (i, s) out -> (k, i, s) :: out) h [] in
-    List.sortWith #(field_num & _ & _) (fun (k, _, _) (k', _, _) -> k - k') entries
-  in
-  {
-    next = next;
-    lookup = lookup;
-    all_nums = all_nums
-  }
-
-let field_error_code_variable_name_of_field
-  (x: (option ident & string))
-: Tot ident
-= let (o, name) = x in
-  match o with
-  | None -> with_dummy_range (to_ident' name)
-  | Some this ->
-    with_dummy_range ({modul_name=this.v.modul_name;
-                       name=this.v.name ^ "__" ^ name})
-
 /// Computed attributes for a decl:
 ///    -- its size in bytes
 ///    -- whether or not it ends with a variable-length field (suffix)
@@ -118,16 +70,8 @@ type global_hash_t = H.t ident' (decl & either decl_attributes macro_signature)
 
 noeq
 type global_env = {
-  ge_h: global_hash_t;
-  ge_fd: field_num_ops_t;
+  ge_h: global_hash_t
 }
-
-let all_nums ge = ge.ge_fd.all_nums ()
-
-let lookup_field_num ge x =
-  match ge.ge_fd.lookup x with
-  | None -> None
-  | Some y -> Some (field_error_code_variable_name_of_field y)
 
 /// Maps locally bound names, i.e., a field name to its type
 ///  -- the bool signifies that this identifier has been used, and is
@@ -883,20 +827,11 @@ let check_field (env:env) (extend_scope: bool) (f:field)
         a, dependent)
     in
     if extend_scope then add_local env sf.field_ident sf.field_type;
-    let field_number =
-        let may_fail = parser_may_fail env sf.field_type in
-        if may_fail
-        || Some? fc //it has a refinement
-        || not (FieldScalar? fa) //it's an array or a string
-        then Some (env.globals.ge_fd.next (env.this, sf.field_ident.v.name))
-        else None
-    in
     let sf = {
         sf with
         field_type = sf_field_type;
         field_array_opt = fa;
         field_constraint = fc;
-        field_number = field_number;
         field_action = f_act
     } in
     Options.debug_print_string
@@ -1123,7 +1058,13 @@ let rec weak_kind_of_fields (e: env) (l: list field) : ML weak_kind =
   | a :: q ->
     let wk = weak_kind_of_field e a in
     if wk <> WeakKindStrongPrefix
-    then failwith (Printf.sprintf "weak_kind_of_fields: field %s : %s should be of strong kind instead of %s" (print_ident a.v.field_ident) (print_typ a.v.field_type) (print_weak_kind wk))
+    then failwith
+          (Printf.sprintf "weak_kind_of_fields: \
+                           field %s : %s should be of strong kind \
+                           instead of %s"
+                           (print_ident a.v.field_ident)
+                           (print_typ a.v.field_type)
+                           (print_weak_kind wk))
     else weak_kind_of_fields e q
 
 let elaborate_record (e:global_env)
@@ -1159,7 +1100,6 @@ let elaborate_record (e:global_env)
             field_type = tunit;
             field_array_opt = FieldScalar;
             field_constraint = w;
-            field_number = Some (env.globals.ge_fd.next (env.this, "__precondition"));
             field_bitwidth = None;
             field_action = None
           }
@@ -1290,29 +1230,9 @@ let bind_decl (e:global_env) (d:decl) : ML decl =
 let bind_decls (g:global_env) (p:list decl) : ML (list decl & global_env) =
   List.map (bind_decl g) p, g
 
-let next_field_num (enclosing_struct:ident)
-                   (field_name:ident)
-                   (env:env)
-   : ML field_num
-   = env.globals.ge_fd.next (Some enclosing_struct, field_name.v.name)
-
-let add_field_error_code_decls (env: env)
-  : ML (list decl)
-  = let l = all_nums env.globals in
-    List.map
-      (fun (z: (field_num & option ident & string)) ->
-        let (i, this, name) = z in
-        mk_decl (Define (field_error_code_variable_name_of_field (this, name))
-                        (Some tfield_id)
-                        (Int UInt64 i))
-                dummy_range
-                ["Auto-generated field identifier for error reporting"]
-                false) l
-
 let initial_global_env () =
   let e = {
-    ge_h = H.create 10;
-    ge_fd = mk_field_num_ops ();
+    ge_h = H.create 10
   }
   in
   let nullary_decl i =
