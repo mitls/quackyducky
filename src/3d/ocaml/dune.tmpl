@@ -19,12 +19,15 @@
     hacl-star
 #endif
     yojson
+    ppx_deriving_yojson.runtime
     re
   )
+  (preprocess (pps ppx_deriving_yojson))
   (flags (:standard -w -8-9-11-26-27-33-39))
 )
 
 (ocamllex lexer)
+
 
 (menhir
   (modules parser)

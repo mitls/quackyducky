@@ -14,10 +14,6 @@ val get_module_name (file: string) : ML string
 
 val get_output_dir : unit -> ML string
 
-val get_error_log : unit -> ML string
-
-val get_error_log_function : unit -> ML string
-
 val debug_print_string (s:string) : ML unit
 
 val get_batch : unit -> ML bool
@@ -51,3 +47,5 @@ val get_makefile : unit -> ML (option makefile_type)
 val get_makefile_name : unit -> ML string
 
 val get_skip_o_rules : unit -> ML bool
+
+val get_json : unit -> ML bool

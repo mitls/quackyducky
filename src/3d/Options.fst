@@ -26,10 +26,9 @@ let clang_format : ref bool = alloc false
 let clang_format_executable : ref (option vstring) = alloc None
 let cleanup : ref bool = alloc false
 let debug : ref bool = alloc false
-let error_log : ref (option vstring) = alloc None
-let error_log_function : ref (option vstring) = alloc None
 let inplace_hashes : ref (list vstring) = alloc []
 let input_file : ref (list string) = alloc []
+let json : ref bool = alloc false
 let no_copy_everparse_h : ref bool = alloc false
 let output_dir : ref (option vstring) = alloc None
 let save_hashes : ref bool = alloc false
@@ -290,9 +289,8 @@ let (display_usage_2, compute_options_2, fstar_options) =
     CmdOption "cleanup" (OptBool cleanup) "Remove *.fst*, *.krml and kremlin-args.rsp (--batch only)" [];
     CmdOption "no_copy_everparse_h" (OptBool no_copy_everparse_h) "Do not Copy EverParse.h (--batch only)" [];
     CmdOption "debug" (OptBool debug) "Emit a lot of debugging output" [];
-    CmdOption "error_log" (OptStringOption "error log" always_valid error_log) "Set the stream to which to log errors (default 'stderr')" [];
-    CmdOption "error_log_function" (OptStringOption "error logging function" always_valid error_log_function) "Use a function to log errors (default 'fprintf')" [];
     CmdFStarOption ('h', "help", FStar.Getopt.ZeroArgs (fun _ -> display_usage (); exit 0), "Show this help message");
+    CmdOption "json" (OptBool json) "Dump the AST in JSON format" [];
     CmdOption "makefile" (OptStringOption "gmake|nmake" valid_makefile makefile) "Do not produce anything, other than a Makefile to produce everything" [];
     CmdOption "makefile_name" (OptStringOption "some file name" always_valid makefile_name) "Name of the Makefile to produce (with --makefile, default <output directory>/EverParse.Makefile" [];
     CmdOption "odir" (OptStringOption "output directory" always_valid output_dir) "output directory (default '.'); writes <module_name>.fst and <module_name>_wrapper.c to the output directory" [];
@@ -340,16 +338,6 @@ let get_module_name (file: string) =
 let get_output_dir () =
   match !output_dir with
   | None -> "."
-  | Some s -> s
-
-let get_error_log () =
-  match !error_log with
-  | None -> "stderr"
-  | Some s -> s
-
-let get_error_log_function () =
-  match !error_log_function with
-  | None -> "fprintf"
   | Some s -> s
 
 let debug_print_string (s:string): ML unit =
@@ -424,3 +412,6 @@ let get_makefile_name _ =
 
 let get_skip_o_rules _ =
   !skip_o_rules
+
+let get_json () =
+  !json

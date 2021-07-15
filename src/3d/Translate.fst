@@ -23,6 +23,7 @@ module T = Target
 module H = Hashtable
 module TS = TypeSizes
 open FStar.All
+open FStar.Pervasives
 
 noeq
 type global_env = {

@@ -20,6 +20,11 @@ open FStar.All
 
 let reserved_prefix = "___"
 
+//redefining either because we need to serialize to Json
+[@@ PpxDerivingYoJson ]
+type either a b =
+  | Inl of a
+  | Inr of b
 
 /// pos: Source locations
 type pos = {
@@ -98,7 +103,14 @@ type with_meta_t 'a = {
   range:range;
   comments: comments
 }
-
+(* Override the json serializers for with_meta_t to
+   avoid polluting the generated JSON with ranges everywhere *)
+let with_meta_t_of_yojson (#a #b #c:Type) (f:(a -> b)) (x:a)
+  : ML c
+  = failwith "No reading yojson"
+let with_meta_t_to_yojson (f:('a -> 'b)) (x:with_meta_t 'a)
+  : 'b
+  = f x.v
 let with_range_and_comments (x:'a) r c : with_meta_t 'a = {
   v = x;
   range = r;
@@ -106,10 +118,12 @@ let with_range_and_comments (x:'a) r c : with_meta_t 'a = {
 }
 let with_range (x:'a) (r:range) : with_meta_t 'a = with_range_and_comments x r []
 
+[@@ PpxDerivingYoJson ]
 type ident' = {
   modul_name : option string;
   name : string
 }
+[@@ PpxDerivingYoJson ]
 let ident = with_meta_t ident'
 
 let ident_to_string i = Printf.sprintf "%s%s"
@@ -135,6 +149,7 @@ let check_reserved_identifier (i:ident) =
   && sub s 0 3 = reserved_prefix
   then error "Identifiers cannot begin with \"___\"" i.range
 
+[@@ PpxDerivingYoJson ]
 type integer_type =
   | UInt8
   | UInt16
@@ -193,6 +208,7 @@ let as_integer_typ (i:ident) : ML integer_type =
     | _ -> err ()
 
 /// Integer, hex and boolean constants
+[@@ PpxDerivingYoJson ]
 type constant =
   | Unit
   | Int : integer_type -> int -> constant
@@ -200,6 +216,7 @@ type constant =
   | Bool of bool
 
 /// Operators supported in refinement expressions
+[@@ PpxDerivingYoJson ]
 type op =
   | Eq
   | Neq
@@ -232,6 +249,7 @@ type op =
 ///   Expressions have no binding structure
 ///   Names are represented using concrete identifiers, i.e., strings
 ///   We enforce that all names are unique in a scope, i.e., no shadowing allowed
+[@@ PpxDerivingYoJson ]
 noeq
 type expr' =
   | Constant of constant
@@ -244,6 +262,7 @@ and expr = with_meta_t expr'
 /// Types: all types are named and fully instantiated to expressions only
 ///   i.e., no type-parameterized types
 
+[@@ PpxDerivingYoJson ]
 noeq
 type typ' =
   | Type_app : ident -> list expr -> typ'
@@ -252,6 +271,7 @@ and typ = with_meta_t typ'
 
 let field_typ = t:typ { Type_app? t.v }
 
+[@@ PpxDerivingYoJson ]
 noeq
 type atomic_action =
   | Action_return of expr
@@ -263,6 +283,7 @@ type atomic_action =
   | Action_call : f:ident -> args:list expr -> atomic_action
 
 noeq
+[@@ PpxDerivingYoJson ]
 type action' =
   | Atomic_action of atomic_action
   | Action_seq : hd:atomic_action -> tl:action -> action'
@@ -271,14 +292,17 @@ type action' =
 and action = with_meta_t action'
 
 
+[@@ PpxDerivingYoJson ]
 type qualifier =
   | Immutable
   | Mutable
 
 /// Parameters: Type definitions can be parameterized by values
 ///   Parameters have a name and are always annoted with their type
+[@@ PpxDerivingYoJson ]
 type param =  typ & ident & qualifier
 
+[@@ PpxDerivingYoJson ]
 noeq
 type bitfield_attr' = {
   bitfield_width : int;
@@ -289,20 +313,24 @@ type bitfield_attr' = {
 }
 and bitfield_attr = with_meta_t bitfield_attr'
 
+[@@ PpxDerivingYoJson ]
 let field_bitwidth_t = either (with_meta_t int) bitfield_attr
 
+[@@ PpxDerivingYoJson ]
 type array_qualifier =
   | ByteArrayByteSize  //[
   | ArrayByteSize      //[:byte-size
   | ArrayByteSizeAtMost //[:byte-size-at-most
   | ArrayByteSizeSingleElementArray //[:byte-size-single-element-array
 
+[@@ PpxDerivingYoJson ]
 noeq
 type field_array_t =
   | FieldScalar
   | FieldArrayQualified of (expr & array_qualifier) //array size in bytes, the qualifier indicates whether this is a variable-length suffix or not
   | FieldString of (option expr)
 
+[@@ PpxDerivingYoJson ]
 noeq
 type struct_field = {
   field_dependence:bool;   //computed; whether or not the rest of the struct depends on this field
@@ -314,15 +342,19 @@ type struct_field = {
   field_action:option (action & bool); //boo indicates if the action depends on the field value
 }
 
+[@@ PpxDerivingYoJson ]
 let field = with_meta_t struct_field
 
+[@@ PpxDerivingYoJson ]
 noeq
 type case =
   | Case : expr -> field -> case
   | DefaultCase : field -> case
 
-type switch_case = expr & list case
+[@@ PpxDerivingYoJson ]
+let switch_case = expr & list case
 
+[@@ PpxDerivingYoJson ]
 type attribute =
   | Entrypoint
   | Aligned
@@ -332,6 +364,7 @@ type attribute =
 ///
 ///   E.g.,
 ///    typedef [entrypoint] struct _T { ... } T, *PTR_T;
+[@@ PpxDerivingYoJson ]
 noeq
 type typedef_names = {
   typedef_name: ident;
@@ -340,6 +373,7 @@ type typedef_names = {
   typedef_attributes: list attribute
 }
 
+[@@ PpxDerivingYoJson ]
 let enum_case = ident & option (either int ident)
 
 /// A 3d specification a list of declarations
@@ -348,6 +382,7 @@ let enum_case = ident & option (either int ident)
 ///   - Enum: enumerated type using existing constants or newly defined constants
 ///   - Record: a struct with refinements
 ///   - CaseType: an untagged union
+[@@ PpxDerivingYoJson ]
 noeq
 type decl' =
   | ModuleAbbrev: ident -> ident -> decl'
@@ -357,6 +392,7 @@ type decl' =
   | Record: names:typedef_names -> params:list param -> where:option expr -> fields:list field -> decl'
   | CaseType: typedef_names -> list param -> switch_case -> decl'
 
+[@@ PpxDerivingYoJson ]
 noeq
 type decl = {
   d_decl : with_meta_t decl';
@@ -370,12 +406,14 @@ let mk_decl (d:decl') r c (is_exported:bool) : decl =
 let decl_with_v (d:decl) (v:decl') : decl =
   { d with d_decl = { d.d_decl with v = v } }
 
+[@@ PpxDerivingYoJson ]
 noeq
 type type_refinement = {
   includes:list string;
   type_map:list (ident * option ident)
 }
 
+[@@ PpxDerivingYoJson ]
 let prog = list decl & option type_refinement
 
 ////////////////////////////////////////////////////////////////////////////////

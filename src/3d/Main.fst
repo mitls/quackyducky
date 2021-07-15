@@ -41,6 +41,7 @@ let translate_module (en:env) (mname:string) (fn:string)
   Options.debug_print_string (FStar.Printf.sprintf "Processing file: %s\nModule name: %s\n" fn mname);
   let decls, refinement = parse_prog fn in
 
+
   Options.debug_print_string "=============After parsing=============\n";
   Options.debug_print_string (print_decls decls);
   Options.debug_print_string "\n";
@@ -57,6 +58,12 @@ let translate_module (en:env) (mname:string) (fn:string)
   Options.debug_print_string (print_decls decls);
   Options.debug_print_string "\n";
 
+  if Options.get_json()
+  then (
+    IO.print_string (JSON.prog_to_json (decls, refinement));
+    IO.print_string "\n"
+  );
+  
   let decls = BitFields.eliminate benv decls in
   
   Options.debug_print_string "=============After bitflds=============\n";
