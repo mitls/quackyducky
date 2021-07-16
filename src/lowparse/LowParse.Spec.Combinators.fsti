@@ -547,7 +547,7 @@ val parse_synth_eq
   (b: bytes)
 : Lemma
   (requires (synth_injective f2))
-  (ensures (parse (parse_synth p1 f2) b == parse_synth' p1 f2 b))
+  (ensures (synth_injective f2 /\ parse (parse_synth p1 f2) b == parse_synth' p1 f2 b))
 
 let bare_serialize_synth
   (#k: parser_kind)
