@@ -51,7 +51,7 @@ let krml out_dir =
 
 (* command lines *)
 let fstar_args0 =
-  "--already_cached" :: "Prims,LowStar,FStar,LowParse,C,Prelude,Actions,ResultOps,Spec" ::
+  "--already_cached" :: "Prims,LowStar,FStar,LowParse,C,Prelude,EverParse3d.\\*,ResultOps,Spec" ::
     "--include" :: lowparse_home ::
       "--include" :: kremlib ::
         "--include" :: (filename_concat kremlib "obj") ::
@@ -214,7 +214,7 @@ let krml_args skip_c_makefiles out_dir files_and_modules =
   let krml_args =
     "-tmpdir" :: out_dir ::
       "-skip-compilation" ::
-        "-static-header" :: "LowParse.Low.ErrorCode,LowParse.Low.Base,Prelude.StaticHeader,ResultOps,EverParse3d.InputBuffer.Aux" ::
+        "-static-header" :: "LowParse.Low.ErrorCode,LowParse.Low.Base,Prelude.StaticHeader,ResultOps,EverParse3d.InputBuffer.Aux,EverParse3d.InputStream.\\*" ::
           "-no-prefix" :: "LowParse.Slice" ::
             "-no-prefix" :: "LowParse.Low.BoundedInt" ::
               "-no-prefix" :: "EverParse3d.InputBuffer.Aux" ::

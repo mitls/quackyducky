@@ -791,7 +791,7 @@ let print_decls (modul: string) (ds:list decl) =
   Printf.sprintf
     "module %s\n\
      open Prelude\n\
-     open Actions\n\
+     open EverParse3d.Actions\n\
      open WeakenTac\n\
      module B = LowStar.Buffer\n\n\
      include %s.Types\n\n\
@@ -810,7 +810,7 @@ let print_types_decls (modul:string) (ds:list decl) =
   Printf.sprintf
     "module %s.Types\n\
      open Prelude\n\
-     open Actions\n\n\
+     open EverParse3d.Actions\n\n\
      module B = LowStar.Buffer\n\n\
      #set-options \"--fuel 0 --ifuel 0 --using_facts_from '* -FStar.Tactics -FStar.Reflection -LowParse'\"\n\n\
      %s"
@@ -826,7 +826,7 @@ let print_decls_signature (mname: string) (ds:list decl) =
     Printf.sprintf
     "module %s\n\
      open Prelude\n\
-     open Actions\n\
+     open EverParse3d.Actions\n\
      module B = LowStar.Buffer\n\
      include %s.Types\n\n\
      %s"
@@ -969,19 +969,26 @@ let print_c_entry (modul: string)
     let impl =
       Printf.sprintf
       "%s {\n\t\
-         uint64_t result = %s(%s, 0);\n\t\
-         if (EverParseResultIsError(result)) {\n\t\t\
-           %sEverParseError(\n\t\
-                  %sStructNameOfErr(result),\n\t\t\t\
-                  %sFieldNameOfErr (result),\n\t\t\t\
-                  EverParseErrorReasonOfResult(result));\n\t\t\
-           return FALSE;\n\t\
-         }\n\t\
+         uint32_t position = 0;\n\t\
+         EverParseInputBuffer inputBuffer;\n\t\
+         inputBuffer.buf = base;\n\t\
+         inputBuffer.len = len;\n\t\
+         inputBuffer.pos = &position;\n\t\
+         {\n\t\t\
+             uint64_t result = %s(%s);\n\t\t\
+             if (EverParseResultIsError(result)) {\n\t\t\t\
+               %sEverParseError(\n\t\t\t\t\
+                  %sStructNameOfErr(result),\n\t\t\t\t\
+                  %sFieldNameOfErr (result),\n\t\t\t\t\
+                  EverParseErrorReasonOfResult(result));\n\t\t\t\
+               return FALSE;\n\t\t\
+             }\n\t\
+         };\n\t\
          return TRUE;\n\
        }"
        signature
        validator_name
-       (((List.Tot.map (fun (id, _) -> print_ident id) d.decl_name.td_params)@["len"; "base"]) |> String.concat ", ")
+       (((List.Tot.map (fun (id, _) -> print_ident id) d.decl_name.td_params)@["inputBuffer"]) |> String.concat ", ")
        modul
        modul
        modul

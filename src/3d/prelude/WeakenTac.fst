@@ -1,6 +1,6 @@
 module WeakenTac
 
-open Actions
+open EverParse3d.Actions
 
 module T = LowParse.TacLib
 

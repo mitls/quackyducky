@@ -32,13 +32,13 @@ EverParse.rsp: $(ALL_KRML_FILES)
 	  -skip-compilation \
 	  -skip-makefiles \
 	  -bundle 'C.\*,FStar.\*,LowStar.\*[rename=SHOULDNOTBETHERE]' \
-	  -bundle 'LowParse.Low.ErrorCode+EverParse3d.InputBuffer.Aux+Prelude.StaticHeader+ResultOps=Prims,LowParse.\*,Prelude,Prelude.\*,Actions,WeakenTac,EverParse3d.\*[rename=EverParse,rename-prefix]' \
+	  -bundle 'LowParse.Low.ErrorCode+EverParse3d.InputBuffer.Aux+Prelude.StaticHeader+ResultOps+EverParse3d.InputStream.Buffer.Aux=Prims,LowParse.\*,Prelude,Prelude.\*,Actions,WeakenTac,EverParse3d.\*[rename=EverParse,rename-prefix]' \
 	  -warn-error -9@4 \
 	  -fnoreturn-else -fparentheses -fcurly-braces -fmicrosoft \
 	  -header ../noheader.txt \
 	  -minimal \
 	  -add-include 'EverParse:"EverParseEndianness.h"' \
-	  -static-header Prelude.StaticHeader,LowParse.Low.Base,ResultOps,LowParse.Low.ErrorCode,EverParse3d.InputBuffer.Aux \
+	  -static-header 'Prelude.StaticHeader,LowParse.Low.Base,ResultOps,LowParse.Low.ErrorCode,EverParse3d.InputBuffer.Aux,EverParse3d.InputStream.\*' \
 	  -no-prefix LowParse.Slice \
 	  -no-prefix LowParse.Low.BoundedInt \
 	  -no-prefix EverParse3d.InputBuffer.Aux \
@@ -54,6 +54,7 @@ EverParse.rsp: $(ALL_KRML_FILES)
 
 %.checked:
 	$(FSTAR) $< --cache_checked_modules $(ALREADY_CACHED)
+	touch $@
 
 %.fst-in %.fsti-in:
 	@echo $(FSTAR_OPTIONS)
